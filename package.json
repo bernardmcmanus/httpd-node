@@ -1,0 +1,13 @@
+{
+	"name": "node-httpd",
+	"description": "A super simple HTTPD server for node.js",
+	"version": "0.1.0",
+    "author": "Bernard McManus",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/elnarddogg/node-httpd.git"
+    },
+    "dependencies": {
+        "mime": ">=1.2.11"
+    }
+}
