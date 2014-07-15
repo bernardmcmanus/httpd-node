@@ -1,12 +1,32 @@
 {
-	"name": "node-httpd",
-	"description": "A super simple HTTPD server for node.js",
-	"version": "0.1.0",
-    "author": "Bernard McManus",
+    "name": "node-httpd",
+    "version": "0.1.0",
+    "description": "A super simple HTTPD server for node.js",
+    "main": "index.js",
+    "bin": {
+        "node-httpd": "httpd.js"
+    },
+    "scripts": {
+        "start": "node standalone.js"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/elnarddogg/node-httpd.git"
     },
+    "keywords": [
+        "http",
+        "server",
+        "simple"
+    ],
+    "author": "Bernard McManus <bernard.mcmanus.iv@gmail.com> (http://bfmiv.com/)",
+    "license": {
+        "type": "MIT",
+        "url": "https://github.com/elnarddogg/node-httpd/blob/master/LICENSE.txt"
+    },
+    "bugs": {
+        "url": "https://github.com/elnarddogg/node-httpd/issues"
+    },
+    "homepage": "https://github.com/elnarddogg/node-httpd",
     "dependencies": {
         "mime": ">=1.2.11"
     }
