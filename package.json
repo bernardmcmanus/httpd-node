@@ -1,5 +1,5 @@
 {
-    "name": "node-httpd",
+    "name": "httpd-node",
     "version": "0.1.0",
     "description": "A super simple HTTPD server for node.js",
     "main": "index.js",
@@ -8,7 +8,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/elnarddogg/node-httpd.git"
+        "url": "https://github.com/elnarddogg/httpd-node.git"
     },
     "keywords": [
         "http",
@@ -18,12 +18,12 @@
     "author": "Bernard McManus <bernard.mcmanus.iv@gmail.com> (http://github.com/elnarddogg/)",
     "license": {
         "type": "MIT",
-        "url": "https://github.com/elnarddogg/node-httpd/blob/master/LICENSE.txt"
+        "url": "https://github.com/elnarddogg/httpd-node/blob/master/LICENSE.txt"
     },
     "bugs": {
-        "url": "https://github.com/elnarddogg/node-httpd/issues"
+        "url": "https://github.com/elnarddogg/httpd-node/issues"
     },
-    "homepage": "https://github.com/elnarddogg/node-httpd",
+    "homepage": "https://github.com/elnarddogg/httpd-node",
     "dependencies": {
         "mime": ">=1.2.11"
     }

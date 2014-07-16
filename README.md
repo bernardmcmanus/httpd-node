@@ -1,4 +1,4 @@
-node-httpd
+httpd-node
 ==========
 
 A super simple HTTPD server for node.js
@@ -6,7 +6,7 @@ A super simple HTTPD server for node.js
 Installation
 -----
 
-	npm install node-httpd
+	npm install httpd-node
 
 Usage
 -----
@@ -17,7 +17,7 @@ Usage
 
 ### Module
 
-    var httpd = require( 'node-httpd' );
+    var httpd = require( 'httpd-node' );
 
     var server = new httpd();
 
