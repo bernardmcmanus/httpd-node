@@ -22,7 +22,7 @@ var httpd = require( 'httpd-node' );
 
 var server = new httpd();
 
-.start();
+server.start();
 
 server.use(function( request , response , data ) {
     // do stuff here
