@@ -17,12 +17,14 @@ Usage
 
 ### Module
 
-    var httpd = require( 'httpd-node' );
+```javascript
+var httpd = require( 'httpd-node' );
 
-    var server = new httpd();
+var server = new httpd();
 
-	server.start();
+.start();
 
-	server.use(function( request , response , data ) {
-		// do stuff here
-	});
+server.use(function( request , response , data ) {
+    // do stuff here
+});
+```
