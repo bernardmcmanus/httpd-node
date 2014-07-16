@@ -3,9 +3,6 @@
     "version": "0.1.0",
     "description": "A super simple HTTPD server for node.js",
     "main": "index.js",
-    "bin": {
-        "node-httpd": "httpd.js"
-    },
     "scripts": {
         "start": "node standalone.js"
     },
@@ -18,7 +15,7 @@
         "server",
         "simple"
     ],
-    "author": "Bernard McManus <bernard.mcmanus.iv@gmail.com> (http://bfmiv.com/)",
+    "author": "Bernard McManus <bernard.mcmanus.iv@gmail.com> (http://github.com/elnarddogg/)",
     "license": {
         "type": "MIT",
         "url": "https://github.com/elnarddogg/node-httpd/blob/master/LICENSE.txt"
