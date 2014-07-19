@@ -19,11 +19,11 @@ module.exports = (function() {
 		protocol: 'http',
 		port: 8888,
 		httpRoot: {
-			default: function() {
-				return Environ.dirname + '/www'
+			default: function( dirname ) {
+				return dirname + '/www'
 			},
-			www: function() {
-				return Environ.dirname + '/www'
+			www: function( dirname ) {
+				return dirname + '/www'
 			}
 		},
 		index: 'index.html',
@@ -92,7 +92,14 @@ module.exports = (function() {
 		},
 
 		getHttpRoot: function( subdomain ) {
-			return (this.httpRoot[subdomain] || this.httpRoot.default)();
+
+			if (typeof this.httpRoot === 'string') {
+				return Environ.dirname + this.httpRoot;
+			}
+			
+			var getter = (this.httpRoot[subdomain] || this.httpRoot.default);
+
+			return typeof getter === 'function' ? getter( Environ.dirname ) : __dirname;
 		},
 
 		_handle: function( request , response ) {

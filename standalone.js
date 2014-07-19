@@ -4,11 +4,11 @@
 
 	var server = new httpd();
 
-	server.start();
-
 	server.use(function( request , response , data ) {
 		console.log(data);
 	});
+
+	server.start();
 
 }());
 
