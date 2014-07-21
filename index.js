@@ -3,6 +3,7 @@ module.exports = (function() {
 
 	var util = require( 'util' );
 	var http = require( 'http' );
+	var https = require( 'https' );
 	var Url = require( 'url' );
 	var fs = require( 'fs' );
 	var mime = require( 'mime' );
@@ -15,20 +16,23 @@ module.exports = (function() {
 	};
 
 
-	var Config = {
-		protocol: 'http',
-		port: 8888,
-		httpRoot: {
-			default: function( dirname ) {
-				return dirname + '/www'
+	function Config() {
+		return {
+			protocol: 'http',
+			port: 8888,
+			httpRoot: {
+				default: function( dirname ) {
+					return dirname + '/www'
+				},
+				www: function( dirname ) {
+					return dirname + '/www'
+				}
 			},
-			www: function( dirname ) {
-				return dirname + '/www'
-			}
-		},
-		index: 'index.html',
-		verbose: true
-	};
+			index: 'index.html',
+			verbose: true,
+			ssl: null
+		};
+	}
 
 
 	function HTTPD() {
@@ -41,15 +45,21 @@ module.exports = (function() {
 			return Array.prototype.pop.call( subject );
 		}
 
-		var keys = Object.keys( Config );
+		var config = new Config();
+		var keys = Object.keys( config );
 
 		keys.forEach(function( key ) {
-			that[key] = (options[key] !== undefined ? options[key] : Config[key]);
+			that[key] = (options[key] !== undefined ? options[key] : config[key]);
 		});
 
 		Codes.forEach(function( handler , code ) {
 			that[code] = handler;
 		});
+
+		if (that.ssl) {
+			that.protocol = 'https';
+			that.ssl = that._getSSLCerts( that.ssl.key , that.ssl.cert );
+		}
 
 		var toUse = [];
 
@@ -76,13 +86,27 @@ module.exports = (function() {
 
 	HTTPD.prototype = {
 
+		_getSSLCerts: function( key , cert ) {
+			return {
+				key: fs.readFileSync( key ),
+				cert: fs.readFileSync( cert )
+			};
+		},
+
 		start: function() {
 			
 			var that = this;
-			
-			http.createServer(function() {
-				that._handle.apply( that , arguments );
-			}).listen( that.port );
+
+			if (that.ssl) {
+				https.createServer( that.ssl , function() {
+					that._handle.apply( that , arguments );
+				}).listen( that.port );
+			}
+			else {
+				http.createServer(function() {
+					that._handle.apply( that , arguments );
+				}).listen( that.port );
+			}
 
 			util.puts( 'server running at ' + that.protocol + '://localhost:' + ( that.port ) + '/' );
 		},
