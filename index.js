@@ -12,7 +12,7 @@ module.exports = (function() {
 
 
 	var Environ = {
-		dirname: __dirname
+		root: __dirname
 	};
 
 
@@ -20,14 +20,6 @@ module.exports = (function() {
 		return {
 			protocol: 'http',
 			port: 8888,
-			httpRoot: {
-				default: function( dirname ) {
-					return dirname + '/www'
-				},
-				www: function( dirname ) {
-					return dirname + '/www'
-				}
-			},
 			index: 'index.html',
 			verbose: true,
 			ssl: null
@@ -39,11 +31,9 @@ module.exports = (function() {
 
 		var that = this;
 		var options = (typeof arguments[0] === 'object' ? pop( arguments ) : {});
-		var callback = (typeof arguments[0] === 'function' ? pop( arguments ) : function() {});
+		//var callback = (typeof arguments[0] === 'function' ? pop( arguments ) : function() {});
 
-		function pop( subject ) {
-			return Array.prototype.pop.call( subject );
-		}
+		that._environ = Object.create( Environ );
 
 		var config = new Config();
 		var keys = Object.keys( config );
@@ -58,8 +48,17 @@ module.exports = (function() {
 
 		if (that.ssl) {
 			that.protocol = 'https';
+			that.port = (that.port === 80 && !options.port ? 443 : that.port);
 			that.ssl = that._getSSLCerts( that.ssl.key , that.ssl.cert );
 		}
+
+		var httpRoot = options.httpRoot ? Object.create( options.httpRoot ) : {};
+
+		Object.defineProperty( that , 'httpRoot' , {
+			get: function() {
+				return httpRoot;
+			}
+		});
 
 		var toUse = [];
 
@@ -76,6 +75,9 @@ module.exports = (function() {
 				return validIndexes;
 			}
 		});
+
+		// add the default httpRoot
+		that.setHttpDir( 'default' , '/www' );
 	}
 
 
@@ -85,6 +87,16 @@ module.exports = (function() {
 
 
 	HTTPD.prototype = {
+
+		environ: function( key , value ) {
+			this._environ[key] = value;
+			return this;
+		},
+
+		setHttpDir: function( domain , value ) {
+			this.httpRoot[domain] = value;
+			return this;
+		},
 
 		_getSSLCerts: function( key , cert ) {
 			return {
@@ -109,21 +121,32 @@ module.exports = (function() {
 			}
 
 			util.puts( 'server running at ' + that.protocol + '://localhost:' + ( that.port ) + '/' );
+
+			return that;
 		},
 
 		use: function( handler ) {
 			this.toUse.push( handler );
+			return this;
 		},
 
 		getHttpRoot: function( subdomain ) {
 
-			if (typeof this.httpRoot === 'string') {
-				return Environ.dirname + this.httpRoot;
-			}
-			
-			var getter = (this.httpRoot[subdomain] || this.httpRoot.default);
+			var that = this;
+			var root = that._environ.root;
 
-			return typeof getter === 'function' ? getter( Environ.dirname ) : __dirname;
+			if (typeof that.httpRoot === 'string') {
+				return root + that.httpRoot;
+			}
+
+			var httpRoot = (that.httpRoot[subdomain] || that.httpRoot.default);
+
+			if (typeof httpRoot === 'function') {
+				return httpRoot( root );
+			}
+			else {
+				return root + httpRoot;
+			}			
 		},
 
 		_handle: function( request , response ) {
@@ -232,6 +255,11 @@ module.exports = (function() {
 			return relative;
 		}
 	};
+
+
+	function pop( subject ) {
+		return Array.prototype.pop.call( subject );
+	}
 
 
 	function pointsToDirectory( path ) {
