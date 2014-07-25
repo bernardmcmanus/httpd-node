@@ -1,6 +1,6 @@
 {
     "name": "httpd-node",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "description": "A super simple HTTPD server for node.js",
     "main": "index.js",
     "scripts": {
@@ -12,8 +12,11 @@
     },
     "keywords": [
         "http",
+        "https",
         "server",
-        "simple"
+        "ssl",
+        "simple",
+        "subdomain"
     ],
     "author": "Bernard McManus <bernard.mcmanus.iv@gmail.com> (http://github.com/elnarddogg/)",
     "license": {
