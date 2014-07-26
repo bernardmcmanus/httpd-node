@@ -86,6 +86,11 @@ module.exports = (function() {
 	};
 
 
+	HTTPD.environ = function( key , value ) {
+		HTTPD.Environ( key , value );
+	};
+
+
 	HTTPD.prototype = {
 
 		environ: function( key , value ) {
