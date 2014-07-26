@@ -8,7 +8,7 @@ module.exports = (function() {
 	var fs = require( 'fs' );
 	var mime = require( 'mime' );
 	var Codes = require( './lib/codes' );
-	var RequestPath = require( './lib/RequestPath' );
+	var RequestPath = require( './lib/requestPath' );
 
 
 	var Environ = {
