@@ -1,13 +1,50 @@
 (function() {
 
-	var httpd = require( './index.js' );
+    var util = require( 'util' );
+    var httpd = require( './index.js' );
 
-	var server = new httpd();
+    //httpd.environ( 'root' , __dirname + 'test' );
 
-	server.use(function( request , response , data ) {
-		console.log(data);
-	});
+    /*new httpd()
+    .use(function( req , res , data ) {
+        console.log(data);
+    })
+    .start();*/
 
-	server.start();
+    new httpd({
+        //verbose: false
+    })
+    .setHttpDir( 'default' , '/test' )
+    .use(function( req , res , data ) {
+
+        //httpd.log( data );
+
+        /*var accept = req.headers['Accept-Encoding'] || '';
+
+        if (accept.indexOf( 'gzip' )) {
+            data.headers['Content-Encoding'] = 'gzip';
+            data.contentSource += '.gz';
+        }*/
+    })
+    .start();
 
 }());
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

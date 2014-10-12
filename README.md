@@ -11,7 +11,7 @@ __httpd-node__ is a simple HTTPD that includes support for ssl and multiple subd
 Installation
 -----
 
-	npm install httpd-node
+    npm install httpd-node
 
 Usage
 -----
@@ -21,12 +21,6 @@ Usage
     npm start
     
 The standalone config can be found in [standalone.js](standalone.js).
-
-### Requiring
-
-```javascript
-var httpd = require( 'httpd-node' );
-```
 
 ### Setting Up the Environment
 
