@@ -4,7 +4,8 @@
     "description": "A super simple HTTPD server for node.js",
     "main": "index.js",
     "scripts": {
-        "start": "node standalone.js"
+        "start": "supervisor standalone.js",
+        "test": "mocha"
     },
     "repository": {
         "type": "git",
@@ -16,7 +17,8 @@
         "server",
         "ssl",
         "simple",
-        "subdomain"
+        "subdomain",
+        "rewrite"
     ],
     "author": "Bernard McManus <bernard.mcmanus.iv@gmail.com> (http://github.com/elnarddogg/)",
     "license": {
@@ -27,6 +29,13 @@
         "url": "https://github.com/elnarddogg/httpd-node/issues"
     },
     "homepage": "https://github.com/elnarddogg/httpd-node",
+    "devDependencies": {
+        "mocha": ">=1.21.4",
+        "chai": ">=1.9.1",
+        "grunt": "~0.4.2",
+        "grunt-contrib-jshint": "~0.6.3",
+        "grunt-contrib-watch": ">=0.6.1"
+    },
     "dependencies": {
         "colors": ">=1.0.2",
         "wee-promise": ">=0.1.4",
@@ -34,3 +43,22 @@
         "mime": "~1.2.11"
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

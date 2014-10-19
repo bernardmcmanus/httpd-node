@@ -1,6 +1,5 @@
 (function() {
 
-    var util = require( 'util' );
     var httpd = require( './index.js' );
 
     //httpd.environ( 'root' , __dirname + 'test' );
@@ -11,20 +10,34 @@
     })
     .start();*/
 
-    new httpd({
+    process.on( 'message' , function( msg ) {
+        if (msg.event === 'exit') {
+            server.stop();
+        }
+    });
+
+    var server = new httpd({
         //verbose: false
     })
-    .setHttpDir( 'default' , '/test' )
-    .use(function( req , res , data ) {
+    .dir( 'default' , '/public' )
+    .rewrite( /\.js$/i ,
+        /*[
+            'Content-Type'
+        ],*/
+        function( req , res , match ) {
+            if (httpd.gzip( req , res )) {
+                match = match.replace( /\.js$/i , '.js.gz' );
+            }
+            return match;
+        }
+    )
+    .use(function( req , res , responseModel ) {
 
-        //httpd.log( data );
-
-        /*var accept = req.headers['Accept-Encoding'] || '';
-
-        if (accept.indexOf( 'gzip' )) {
-            data.headers['Content-Encoding'] = 'gzip';
-            data.contentSource += '.gz';
+        /*if ((/\.html$/i).test( responseModel.responsePath )) {
+            responseModel.headers['Content-Type'] = 'text/plain';
         }*/
+
+        httpd.log( responseModel );
     })
     .start();
 
