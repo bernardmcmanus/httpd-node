@@ -30,7 +30,6 @@
     },
     "homepage": "https://github.com/elnarddogg/httpd-node",
     "devDependencies": {
-        "mojo": "git://github.com/elnarddogg/mojo.git#working",
         "mocha": ">=1.21.4",
         "chai": ">=1.9.1",
         "grunt": "~0.4.2",
@@ -38,10 +37,11 @@
         "grunt-contrib-watch": ">=0.6.1"
     },
     "dependencies": {
+        "mojo": "git://github.com/elnarddogg/mojo.git#working",
         "colors": ">=1.0.2",
         "wee-promise": ">=0.1.4",
         "fs-extra": "0.9.1",
-        "mime": "~1.2.11"
+        "mime": ">=1.2.11"
     }
 }
 
