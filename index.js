@@ -9,7 +9,7 @@ module.exports = (function() {
     var https = require( 'https' );
     var colors = require( 'colors' );
     var fs = require( 'fs-extra' );
-    //var mime = require( 'mime' );
+    var MOJO = require( 'mojo' );
     var Promise = require( 'wee-promise' );
 
 
@@ -17,13 +17,14 @@ module.exports = (function() {
     var Rewrite = require( './lib/rewrite' );
     var RouteModel = require( './models/routeModel' );
     var ResponseModel = require( './models/responseModel' );
-    var Log = require( './lib/logger' );
+    var log = require( './lib/logger' );
 
 
     var Environ = {
         root: __dirname,
         logLevel: 'info',
-        version: fs.readJsonSync( './package.json' ).version
+        version: fs.readJsonSync( './package.json' ).version,
+        profile: 'prod'
     };
 
     Object.defineProperty( Environ , '_logLevels' , {
@@ -45,12 +46,14 @@ module.exports = (function() {
             that[key] = options[key];
         });
 
-        that._environ = Object.create( Environ );
+        that._environ = new MOJO( Environ );
         that.listening = false;
 
         if (that.ssl) {
             that.ssl = httpd._readSSL( that.ssl.key , that.ssl.cert );
         }
+
+        MOJO.construct( that );
 
         Object.defineProperties( that , {
             protocol: {
@@ -63,12 +66,23 @@ module.exports = (function() {
             },
             _use: {
                 value: []
-                //value: {}
             },
             _rewriteRules: {
                 value: {}
             }
         });
+
+        // add environ event listeners
+        that._environ.$when([ '$$set' ] , that );
+
+        // add httpd event listeners
+        that.$when([
+            '$$set',
+            '$$serve',
+            '$$error',
+            '$$connect',
+            '$$disconnect'
+        ], that );
 
         // add the default httpRoot
         that.dir( 'default' , '/www' );
@@ -80,16 +94,11 @@ module.exports = (function() {
     }
 
 
-    httpd.log = Log;
+    httpd.log = log;
 
 
     httpd.environ = function( key , value ) {
         Environ[key] = value;
-    };
-
-
-    httpd._getLogLevelIndex = function( text ) {
-        return Environ._logLevels.indexOf( text );
     };
 
 
@@ -103,78 +112,27 @@ module.exports = (function() {
     };
 
 
-    /*httpd._formatCode = function( code ) {
-        code = code.toString();
-        switch (code) {
-            case '200':
-                return ( '[' + code + ']' ).green;
-            case '302':
-                return ( '[' + code + ']' ).cyan;
-            case '401':
-            case '404':
-                return ( '[' + code + ']' ).yellow;
-            case '500':
-                return ( '[' + code + ']' ).red;
-            default:
-                return ( '[' + code + ']' ).white;
-        }
-    };*/
-
-
-    /*httpd.log = function() {
-        
-        var args = Array.prototype.slice.call( arguments , 0 );
-        
-        if (args[0] instanceof Error) {
-            return httpd._logError( args[0] );
-        }
-
-        var str = args
-        .map(function( arg ) {
-            return util.inspect.apply( util , [ arg , { colors: true, depth: null }]);
-        })
-        .join( ' ' ) + '\n';
-
-        console.log( str );
-    };*/
-
-
-    /*httpd._logRequest = function( req , code , reqPath ) {
-
-        var reqdata = {
-            requestPath: reqPath.original,
-            query: reqPath.query,
-            remoteAddress: getRemoteAddress( req ),
-            timestamp: new Date().toUTCString()
-        };
-
-        util.print(
-            httpd._formatCode( code ) + ' ->\n'
-        );
-        
-        httpd.log( reqdata );
-    };*/
-
-
-    /*httpd._logError = function( err ) {
-        var stack = err.stack.split( '\n' );
-        var message = stack.shift();
-        stack = stack.join( '\n' );
-        util.puts(
-            ( message ).red
-        );
-        util.puts(
-            ( stack ).gray
-        );
-    };*/
-
-
-    httpd._fatal = function( res , err ) {
-        Log.error( err );
-        res.writeHead( 500 , {
-            'Content-Type': 'text/plain'
+    httpd.cleanHeaders = function( res ) {
+        [
+            'Content-Encoding'
+        ]
+        .forEach(function( key ) {
+            res.removeHeader( key );
         });
-        res.end( '500 Internal Server Error\n' );
+    };
+
+
+    httpd._getLogLevelIndex = function( text ) {
+        return Environ._logLevels.indexOf( text );
+    };
+
+
+    httpd._fatal = function( res , err , stack ) {
+        var routeModel = new RouteModel( 500 );
+        httpd.cleanHeaders( res );
+        res.writeHead( 500 , routeModel.headers );
+        res.write( routeModel.body );
+        res.end( stack ? err.stack : '' );
     };
 
 
@@ -186,7 +144,7 @@ module.exports = (function() {
     };
 
 
-    httpd.prototype = {
+    httpd.prototype = MOJO.create({
 
         use: function( handler ) {
             var that = this;
@@ -197,8 +155,7 @@ module.exports = (function() {
         rewrite: function( /*regexp , subdomain , headers , handler*/ ) {
             
             var that = this;
-            //var args = Array.prototype.slice.call( arguments , 0 );
-            var args = Array.cast( arguments );
+            var args = arrayCast( arguments );
 
             var handler = args.pop();
             var regexp = args.shift();
@@ -217,7 +174,7 @@ module.exports = (function() {
 
         environ: function( key , value ) {
             var that = this;
-            that._environ[key] = value;
+            that._environ.$set( key , value );
             return that;
         },
 
@@ -233,7 +190,6 @@ module.exports = (function() {
 
             that._createServer().then(function( server ) {
                 that.server = server;
-                that.listening = true;
                 util.puts(
                     (
                         'server running at '
@@ -243,9 +199,11 @@ module.exports = (function() {
                     ).cyan
                 );
             })
+            .then(function() {
+                that.$emit( '$$connect' );
+            })
             .catch(function( err ) {
-                that.listening = false;
-                that._log( err , 4 );
+                that.$emit( '$$error' , err );
             });
 
             return that;
@@ -253,8 +211,11 @@ module.exports = (function() {
 
         stop: function( callback ) {
             var that = this;
-            that.server.close( callback );
-            that.listening = false;
+            callback = callback || function() {};
+            that.server.close(function() {
+                that.$emit( '$$disconnect' );
+                callback();
+            });
         },
 
         getHttpRoot: function( subdomain ) {
@@ -262,6 +223,48 @@ module.exports = (function() {
             var root = that._environ.root;
             var httpRoot = that.httpRoot[subdomain];
             return root + httpRoot;
+        },
+
+        handleMOJO: function() {
+
+            var that = this;
+            var args = arrayCast( arguments );
+            var e = args.shift();
+            var target, key, err;
+
+            if (MOJO.Event.isPrivate( e.type )) {
+                that.$emit( e.type.replace( /^\${2}/ , '' ) , args );
+            }
+
+            switch (e.type) {
+
+                case '$$set':
+                    target = e.target;
+                    key = args.pop();
+                    if (target === that._environ && that._environ[key] === 'dev') {
+                        that.environ( 'logLevel' , 'trace' );
+                    }
+                break;
+
+                case '$$serve':
+                    if (that.verbose) {
+                        httpd.log.request.apply( null , args );
+                    }
+                break;
+
+                case '$$error':
+                    err = args.shift();
+                    that._log( err , 4 );
+                break;
+
+                case '$$connect':
+                    that.listening = true;
+                break;
+
+                case '$$disconnect':
+                    that.listening = false;
+                break;
+            }
         },
 
         _createServer: function() {
@@ -273,7 +276,7 @@ module.exports = (function() {
                     that._handle.apply( that , arguments );
                 }
                 catch( err ) {
-                    httpd._fatal( res , err );
+                    that._fatal( res , err );
                 }
             }
 
@@ -289,9 +292,7 @@ module.exports = (function() {
                 }
 
                 server.on( 'clientError' , function( err ) {
-                    if (that.verbose) {
-                        Log( err );
-                    }
+                    that.$emit( '$$error' , err );
                 });
 
                 server.listen( that.port , function() {
@@ -328,7 +329,7 @@ module.exports = (function() {
                 that._serve( req , res , reqPath , resModel , routeModel.body );
             })
             .catch(function( err ) {
-                httpd._fatal( res , err );
+                that._fatal( res , err );
             });
         },
 
@@ -371,7 +372,7 @@ module.exports = (function() {
                     resolve( routeModel );
                 })
                 .catch(function( err ) {
-                    that._log( err , 4 );
+                    that.$emit( '$$error' , err );
                     resolve(
                         new RouteModel( reqPath , { code: 404 })
                     );
@@ -386,9 +387,7 @@ module.exports = (function() {
             res.writeHead( resModel.statusCode , resModel.headers );
             res.end( body );
 
-            if (that.verbose) {
-                Log.request( req , resModel.statusCode , reqPath );
-            }
+            that.$emit( '$$serve' , [ req , resModel.statusCode , reqPath ]);
         },
 
         _log: function( args , level ) {
@@ -396,8 +395,15 @@ module.exports = (function() {
             var logLevel = that._environ.logLevel;
             args = Array.isArray( args ) ? args : [ args ];
             if (level <= httpd._getLogLevelIndex( logLevel )) {
-                Log.apply( null , args );
+                httpd.log.apply( null , args );
             }
+        },
+
+        _fatal: function( res , err ) {
+            var that = this;
+            var stack = that._environ.profile === 'dev';
+            that.$emit( '$$error' , err );
+            httpd._fatal( res , err , stack );
         },
 
         _getRewriteRules: function( subdomain ) {
@@ -409,46 +415,12 @@ module.exports = (function() {
             var arr = (req.headers.host || '').split( '.' );
             return (arr.length < 2 ? 'default' : arr[0]);
         }
-    };
+    });
 
 
-    /*function getErrorType( err ) {
-        if (err instanceof EvalError) {
-            return 'EvalError';
-        }
-        else if (err instanceof RangeError) {
-            return 'RangeError';
-        }
-        else if (err instanceof ReferenceError) {
-            return 'ReferenceError';
-        }
-        else if (err instanceof TypeError) {
-            return 'TypeError';
-        }
-        else if (err instanceof URIError) {
-            return 'URIError';
-        }
-        else {
-            return 'Error';
-        }
-    }*/
-
-
-    /*function getRemoteAddress( req ) {
-        return (
-            req.headers['x-forwarded-for'] || 
-            req.connection.remoteAddress || 
-            req.socket.remoteAddress
-        );
-    }*/
-
-
-    /*function arrayCast() {
-        return Array.prototype.slice.call( arguments , 0 );
-    }*/
-    Array.cast = function( subject ) {
+    function arrayCast( subject ) {
         return Array.prototype.slice.call( subject , 0 );
-    };
+    }
 
 
     function readFile( filepath ) {

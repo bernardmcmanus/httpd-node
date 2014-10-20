@@ -1,13 +1,20 @@
+/* jshint -W069 */
+
 module.exports = (function() {
 
 
     var mime = require( 'mime' );
     
     
-    function RouteModel( reqPath , data ) {
+    function RouteModel( /*reqPath , code , data*/ ) {
+
+        var args = arrayCast( arguments );
+        var data = typeof last( args ) === 'object' ? args.pop() : {};
+        var code = data.code || args.pop();
+        var reqPath = args.pop() || {};
         
         var that = this;
-        var statusCode = data.code;
+        var statusCode = code;
         var headers = data.headers || {};
         var body = data.body || '';
 
@@ -37,6 +44,21 @@ module.exports = (function() {
         that.statusCode = statusCode;
         that.headers = headers;
         that.body = body;
+    }
+
+
+    function isNumber( subject ) {
+        return !isNaN( subject * 1 );
+    }
+
+    
+    function last( array ) {
+        return array[array.length - 1];
+    }
+
+
+    function arrayCast( subject ) {
+        return Array.prototype.slice.call( subject , 0 );
     }
 
 

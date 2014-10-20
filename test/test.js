@@ -32,7 +32,7 @@
         new TestRoute( 404 , '/sub/notfound/' , '/sub/notfound/index.html' ),
         new TestRoute( 404 , '/sub/notfound/asdf2/' , '/sub/notfound/asdf2/index.html' ),
         new TestRoute( 404 , '/sub/notfound/asdf3/' , '/sub/notfound/asdf3/index.html' ),
-        new TestRoute( 200 , '/hx.min.js' , '/hx.min.js.gz' , {
+        new TestRoute( 200 , '/script.min.js' , '/script.min.js.gz' , {
             'Content-Type': 'application/javascript'
         })
     ];
@@ -71,9 +71,9 @@
 
         it( 'should push to the _rewriteRules array' , function( done ) {
             server.rewrite( /\.js$/i ,
-                /*[
+                [
                     'Content-Type'
-                ],*/
+                ],
                 function( req , res , match ) {
                     if (httpd.gzip( req , res )) {
                         match = match.replace( /\.js$/i , '.js.gz' );
@@ -89,9 +89,10 @@
     describe( '#start' , function() {
         it( 'should start the httpd instance' , function( done ) {
             util.print( '      ' );
-            server.start();
-            assert.ok( true );
-            done();
+            server.start().$once( 'connect' , function( e ) {
+                assert.ok( true );
+                done();
+            });
         });
     });
 
@@ -106,9 +107,9 @@
                     });
                 };
                 return get( tr.path ).then(function( res ) {
-                    //trycatch( done , function() {
+                    trycatch( done , function() {
                         expect( res.body ).to.equal( tr.body );
-                    //});
+                    });
                 });
             });
 

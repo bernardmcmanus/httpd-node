@@ -8,7 +8,7 @@ module.exports = (function() {
         that.statusCode = routeModel.statusCode;
         that.requestPath = reqPath.original;
         that.responsePath = reqPath.current.rel;
-        that.query = reqPath.query;
+        that.get = reqPath.get;
         that.rewrite = !!reqPath.rewritten;
         that.headers = routeModel.headers;
     }
