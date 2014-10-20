@@ -161,14 +161,6 @@ module.exports = (function() {
             var regexp = args.shift();
             var subdomain = (typeof args[0] === 'string' ? args.shift() : 'default');
             var headers = (Array.isArray( args[0] ) ? args.pop() : null);
-
-            httpd.log({
-                handler: handler,
-                regexp: regexp,
-                headers: headers,
-                subdomain: subdomain
-            });
-
             var subset = that._rewriteRules[subdomain] || [];
 
             subset.push(
