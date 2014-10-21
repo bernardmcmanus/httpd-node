@@ -70,17 +70,16 @@
     describe( '#rewrite' , function() {
 
         it( 'should push to the _rewriteRules array' , function( done ) {
-            server.rewrite( /\.js$/i ,
-                [
-                    'Content-Type'
-                ],
-                function( req , res , match ) {
+            server.rewrite({
+                pattern: /\.js$/i,
+                preserve: true,
+                handle: function( req , res , match ) {
                     if (httpd.gzip( req , res )) {
                         match = match.replace( /\.js$/i , '.js.gz' );
                     }
                     return match;
                 }
-            );
+            });
             expect( server._rewriteRules.default.length ).to.equal( 1 );
             done();
         });

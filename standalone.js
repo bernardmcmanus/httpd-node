@@ -11,17 +11,16 @@
     var server = new httpd()
     .dir( 'default' , '/public' )
     .environ( 'profile' , 'dev' )
-    .rewrite( /\.js$/i ,
-        [
-            'Content-Type'
-        ],
-        function( req , res , match ) {
+    .rewrite({
+        pattern: /\.js$/i,
+        preserve: true,
+        handle: function( req , res , match ) {
             if (httpd.gzip( req , res )) {
                 match = match.replace( /\.js$/i , '.js.gz' );
             }
             return match;
         }
-    )
+    })
     .use(function( req , res , responseModel ) {
         httpd.log( responseModel );
     })

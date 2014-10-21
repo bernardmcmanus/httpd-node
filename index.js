@@ -8,6 +8,7 @@ module.exports = (function() {
     var http = require( 'http' );
     var https = require( 'https' );
     var colors = require( 'colors' );
+    var mime = require( 'mime' );
     var fs = require( 'fs-extra' );
     var MOJO = require( 'mojo' );
     var Promise = require( 'wee-promise' );
@@ -146,28 +147,23 @@ module.exports = (function() {
 
     httpd.prototype = MOJO.create({
 
-        use: function( handler ) {
+        use: function( handle ) {
             var that = this;
-            that._use.push( handler );
+            that._use.push( handle );
             return that;
         },
 
-        rewrite: function( /*regexp , subdomain , headers , handler*/ ) {
+        rewrite: function( options ) {
             
             var that = this;
-            var args = arrayCast( arguments );
+            var pattern = options.pattern;
+            var handle = options.handle;
+            var subdomain = options.subdomain || 'default';
+            var preserve = !!options.preserve;
 
-            var handler = args.pop();
-            var regexp = args.shift();
-            var subdomain = (typeof args[0] === 'string' ? args.shift() : 'default');
-            var headers = (Array.isArray( args[0] ) ? args.pop() : null);
-            var subset = that._rewriteRules[subdomain] || [];
-
-            subset.push(
-                new Rewrite( regexp , handler , headers )
+            that._getRewriteRules( subdomain ).push(
+                new Rewrite( pattern , handle , preserve )
             );
-
-            that._rewriteRules[subdomain] = subset;
 
             return that;
         },
@@ -209,12 +205,10 @@ module.exports = (function() {
             return that;
         },
 
-        stop: function( callback ) {
+        stop: function() {
             var that = this;
-            callback = callback || function() {};
             that.server.close(function() {
                 that.$emit( '$$disconnect' );
-                callback();
             });
         },
 
@@ -305,15 +299,18 @@ module.exports = (function() {
 
             var that = this;
             var subdomain = that._getSubdomain( req );
-            var rules = that._getRewriteRules( subdomain );
             var httpRoot = that.getHttpRoot( subdomain );
             var reqPath = new RequestPath( req.url , httpRoot );
+            var rules = that._getRewriteRules( subdomain );
+            var rewriter = Rewrite.match( reqPath , rules );
 
-            reqPath.rewrite(
-                Rewrite.match( reqPath , rules )( req , res , reqPath.relative )
-            );
+            if (rewriter) {
+                reqPath.rewrite(
+                    rewriter.handle( req , res , reqPath.relative )
+                );
+            }
 
-            that._route( reqPath ).then(function( routeModel ) {
+            that._route( reqPath , rewriter ).then(function( routeModel ) {
 
                 var resModel = new ResponseModel(
                     subdomain,
@@ -322,8 +319,8 @@ module.exports = (function() {
                     routeModel
                 );
 
-                that._use.forEach(function( handler ) {
-                    handler( req , res , resModel );
+                that._use.forEach(function( handle ) {
+                    handle( req , res , resModel );
                 });
 
                 that._serve( req , res , reqPath , resModel , routeModel.body );
@@ -333,7 +330,7 @@ module.exports = (function() {
             });
         },
 
-        _route: function( reqPath ) {
+        _route: function( reqPath , rewriter ) {
 
             var that = this;
 
@@ -342,7 +339,11 @@ module.exports = (function() {
                 if (reqPath.pointsToDirectory) {
                     reqPath.append( '/' );
                     resolve(
-                        new RouteModel( reqPath , { code: 302 })
+                        new RouteModel( 302 , {
+                            headers: {
+                                'Location': reqPath.full
+                            }
+                        })
                     );
                     return;
                 }
@@ -353,16 +354,27 @@ module.exports = (function() {
 
                 Promise.all([
                     readFile( reqPath.current.abs ),
-                    fileStat( reqPath.current.abs )
+                    fileStat( reqPath.current.abs ),
+                    new Promise(function( resolve ) {
+                        var ct;
+                        if (rewriter && rewriter.preserve) {
+                            ct = mime.lookup( reqPath.absolute );
+                        }
+                        else {
+                            ct = mime.lookup( reqPath.current.abs );
+                        }
+                        resolve( ct );
+                    })
                 ])
                 .then(function( args ) {
 
                     var body = args[0];
                     var stats = args[1];
+                    var ct = args[2];
 
-                    var routeModel = new RouteModel( reqPath , {
-                        code: 200,
+                    var routeModel = new RouteModel( 200 , {
                         headers: {
+                            'Content-Type': ct,
                             'Content-Length': stats.size,
                             'Last-Modified': new Date( stats.mtime ).toUTCString()
                         },
@@ -374,7 +386,7 @@ module.exports = (function() {
                 .catch(function( err ) {
                     that.$emit( '$$error' , err );
                     resolve(
-                        new RouteModel( reqPath , { code: 404 })
+                        new RouteModel( 404 )
                     );
                 });
             });
@@ -408,7 +420,9 @@ module.exports = (function() {
 
         _getRewriteRules: function( subdomain ) {
             var that = this;
-            return that._rewriteRules[subdomain] || [];
+            var rules = that._rewriteRules[subdomain] || [];
+            that._rewriteRules[subdomain] = rules;
+            return rules;
         },
 
         _getSubdomain: function( req ) {
