@@ -426,10 +426,16 @@ module.exports = (function() {
         },
 
         _getSubdomain: function( req ) {
-            var arr = (req.headers.host || '').split( '.' );
-            return (arr.length < 2 ? 'default' : arr[0]);
+            var host = req.headers.host || '';
+            var arr = host.split( '.' );
+            return (isIP( host ) || arr.length < 2 ? 'default' : arr[0]);
         }
     });
+
+
+    function isIP( host ) {
+        return (/(\d{1,3}\.){3}\d{1,3}/).test( host );
+    }
 
 
     function arrayCast( subject ) {
