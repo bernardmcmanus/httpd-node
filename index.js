@@ -83,7 +83,7 @@ module.exports = (function() {
             '$$error',
             '$$connect',
             '$$disconnect'
-        ], that );
+        ]);
 
         // add the default httpRoot
         that.dir( 'default' , '/www' );
@@ -226,10 +226,6 @@ module.exports = (function() {
             var e = args.shift();
             var target, key, err;
 
-            if (MOJO.Event.isPrivate( e.type )) {
-                that.$emit( e.type.replace( /^\${2}/ , '' ) , args );
-            }
-
             switch (e.type) {
 
                 case '$$set':
@@ -311,6 +307,10 @@ module.exports = (function() {
             }
 
             that._route( reqPath , rewriter ).then(function( routeModel ) {
+
+                if (routeModel.statusCode !== 200) {
+                    httpd.cleanHeaders( res );
+                }
 
                 var resModel = new ResponseModel(
                     subdomain,

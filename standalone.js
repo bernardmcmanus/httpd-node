@@ -22,13 +22,15 @@
         }
     })
     .use(function( req , res , responseModel ) {
-        httpd.log( responseModel );
+        //httpd.log( responseModel );
+    })
+    .$when([ 'set' , 'serve' , 'error' , 'connect' , 'disconnect' ] , function( e ) {
+        //httpd.log(e);
     })
     .start();
 
-    server.$dispel();
-
-    httpd.log(server.handlers);
+    //server.$dispel();
+    //httpd.log(server.handlers);
 
 }());
 
