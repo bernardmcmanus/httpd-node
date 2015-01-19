@@ -13,6 +13,8 @@ module.exports = (function() {
   var Promise = require( 'es6-promise' ).Promise;
 
 
+  var $Request = require( './lib/request' );
+  var $Response = require( './lib/response' );
   var RequestPath = require( './lib/requestPath' );
   var Rewrite = require( './lib/rewrite' );
   var RouteModel = require( './models/routeModel' );
@@ -20,6 +22,7 @@ module.exports = (function() {
   var log = require( './lib/logger' );
 
 
+  var USE = 'use';
   var ERROR = 'error';
   var SERVE = 'serve';
   var CONNECT = 'connect';
@@ -72,9 +75,9 @@ module.exports = (function() {
       httpRoot: {
         value: {}
       },
-      _use: {
+      /*_use: {
         value: []
-      },
+      },*/
       _rewriteRules: {
         value: {}
       }
@@ -150,8 +153,10 @@ module.exports = (function() {
 
     use: function( handle ) {
       var that = this;
-      that._use.push( handle );
-      return that;
+      return that.$when( USE , function() {
+        var args = arrayCast( arguments ).slice( 1 );
+        handle.apply( null , args );
+      });
     },
 
     rewrite: function( options ) {
@@ -169,7 +174,7 @@ module.exports = (function() {
       return that;
     },
 
-    environ: function( key , value ) {
+    env: function( key , value ) {
       var that = this;
       var environ = that._environ;
       environ.$emit( 'set' , key , function( e ) {
@@ -219,8 +224,9 @@ module.exports = (function() {
     getHttpRoot: function( subdomain ) {
       var that = this;
       var root = that._environ.root;
-      var httpRoot = that.httpRoot[subdomain];
-      return root + httpRoot;
+      var httpRoot = that.httpRoot;
+      var relative = httpRoot[subdomain] || httpRoot.default;
+      return root + relative;
     },
 
     handleE$: function() {
@@ -236,13 +242,13 @@ module.exports = (function() {
           target = e.target;
           key = args.pop();
           if (target === that._environ && that._environ[key] === 'dev') {
-            that.environ( 'logLevel' , 'trace' );
+            that.env( 'logLevel' , 'trace' );
           }
         break;
 
         case SERVE:
           if (that.verbose) {
-            httpd.log.request.apply( null , args );
+            //httpd.log.request.apply( null , args );
           }
         break;
 
@@ -265,39 +271,110 @@ module.exports = (function() {
       
       var that = this;
 
-      return new Promise(function( resolve , reject ) {
-
-        var server;
-
+      return new Promise(function( resolve ) {
+        resolve( that.ssl ? https : http );
+      })
+      .then(function( module ) {
+        
+        var args = [ that._handle ];
+        
         if (that.ssl) {
-          server = https.createServer( that.ssl , that._handle );
-        }
-        else {
-          server = http.createServer( that._handle );
+          args.unshift( that.ssl );
         }
 
-        server.listen( that.port , function() {
-          resolve( server );
+        return new Promise(function( resolve ) {
+
+          var server = module.createServer.apply( module , args );
+
+          server.on( 'clientError' , function( err ) {
+            that._log( err.message , 'info' );
+            //that.$emit( ERROR , err );
+          });
+
+          server.listen( that.port , function() {
+            resolve( server );
+          });
         });
+      })
+      .then(function( server ) {
+        return server;
       });
+    },
+
+    _spawnRequest: function( req ) {
+      var that = this;
+      var subdomain = that._getSubdomain( req );
+      var httpRoot = that.getHttpRoot( subdomain );
+      var rewriteRules = that._getRewriteRules( subdomain );
+      return new $Request( req , {
+        subdomain: subdomain,
+        rootDir: httpRoot,
+        rewriteRules: rewriteRules,
+        index: that.index
+      });
+    },
+
+    _spawnResponse: function( $req , res ) {
+      var that = this;
+      return new $Response( $req , res );
     },
 
     _handle: function( req , res ) {
 
       var that = this;
-      var subdomain = that._getSubdomain( req );
-      var httpRoot = that.getHttpRoot( subdomain );
+
+      var $req = that._spawnRequest( req );
+      //var $response = that._spawnResponse( $req , res );
+
+      $req.$process().then(function() {
+        //httpd.log($req);
+      })
+      .then(function() {
+
+        if ($req.$err) {
+          that.$emit( ERROR , $req.$err );
+        }
+
+        return that._spawnResponse( $req , res );
+      })
+      .then(function( $res ) {
+
+        httpd.log($res);
+        
+        //that.$emit( USE , [ $req , $res ]);
+        
+        console.log('end');
+
+        return new Promise(function( resolve , reject ) {
+          that.$emit( SERVE , [ $req , $res ] , resolve );
+          reject();
+        })
+        .then(function() {
+          return $res.$send();
+        });
+      })
+      .catch(function( err ) {
+        httpd.log(err);
+      });
+
+      return;
+
+      var subdomain = $req.$subdomain;
+      //var subdomain = that._getSubdomain( req );
+      var httpRoot = $req.$rootDir;
+      //var httpRoot = that.getHttpRoot( subdomain );
+      //var reqPath = $req.$reqPath;
       var reqPath = new RequestPath( req.url , httpRoot );
-      var rules = that._getRewriteRules( subdomain );
-      var rewriter = Rewrite.match( reqPath , rules );
+      /*var rules = that._getRewriteRules( subdomain );
+      var rewriter = Rewrite.match( reqPath.relative , rules );
 
       if (rewriter) {
         reqPath.rewrite(
           rewriter.handle( req , res , reqPath.relative )
         );
-      }
+      }*/
 
-      that._route( reqPath , rewriter ).then(function( routeModel ) {
+      that._route( reqPath , {}/*rewriter*/ ).then(function( routeModel ) {
 
         if (routeModel.statusCode !== 200) {
           httpd.cleanHeaders( res );
@@ -310,11 +387,9 @@ module.exports = (function() {
           routeModel
         );
 
-        that._use.forEach(function( handle ) {
-          handle( req , res , resModel );
-        });
+        that.$emit( USE , [ $request , $response , resModel ]);
 
-        that._serve( req , res , reqPath , resModel , routeModel );
+        that._serve( $request , $response , reqPath , resModel , routeModel );
       })
       .catch(function( err ) {
         that._fatal( res , err );
@@ -324,30 +399,17 @@ module.exports = (function() {
     _route: function( reqPath , rewriter ) {
 
       var that = this;
+      var statusCode;
 
-      return new Promise(function( resolve , reject ) {
+      return new Promise(function( resolve ) {
 
-        if (reqPath.pointsToDirectory) {
-          reqPath.append( '/' );
-          resolve(
-            new RouteModel( 302 , {
-              headers: {
-                'Location': reqPath.full
-              }
-            })
-          );
-          return;
-        }
+        resolve( reqPath.pointsToDirectory );
 
-        if (reqPath.pointsToIndex) {
-          reqPath.append( that.index );
-        }
-
-        Promise.all([
+        /*Promise.all([
           getFileStat( reqPath.current.abs ),
           getFileMime( reqPath , ( rewriter && rewriter.preserve ))
-        ])
-        .then(function( args ) {
+        ])*/
+        /*.then(function( args ) {
 
           var stats = args[0];
           var contentType = args[1];
@@ -367,7 +429,71 @@ module.exports = (function() {
           resolve(
             new RouteModel( 404 )
           );
+        });*/
+      })
+      .then(function( pointsToDirectory ) {
+
+        if (pointsToDirectory) {
+
+          statusCode = 302;
+
+          reqPath.append( '/' );
+          return reqPath.redirect();
+          /*return new RouteModel( 302 , {
+            headers: {
+              'Location': reqPath.full
+            }
+          });*/
+        }
+        else if (reqPath.pointsToIndex) {
+          statusCode = 200;
+          reqPath.append( that.index );
+          return reqPath;
+          //return true;
+        }
+
+        /*if (reqPath.pointsToIndex) {
+          reqPath.append( that.index );
+        }*/
+      })
+      .then(function( reqPath ) {
+        //if (proceed === true) {
+          return Promise.all([
+            getFileStat( reqPath.current.abs ),
+            getFileMime( reqPath , ( rewriter && rewriter.preserve ))
+          ]);
+        //}
+      })
+      .then(function( args ) {
+
+        if (!args) {
+          return;
+        }
+
+        var stats = args[0];
+        var contentType = args[1];
+
+        return new Promise(function( resolve ) {
+
+          var routeModel = new RouteModel( statusCode , {
+            headers: {
+              'Content-Type': contentType,
+              'Content-Length': stats.size,
+              'Last-Modified': new Date( stats.mtime ).toUTCString()
+            }
+          });
+
+          resolve( routeModel );
+        })
+        .catch(function( err ) {
+          that.$emit( ERROR , err );
+          return new RouteModel( 404 );
         });
+
+      })
+      .catch(function( err ) {
+        that.$emit( ERROR , err );
+        return new RouteModel( 500 );
       });
     },
 
@@ -386,13 +512,11 @@ module.exports = (function() {
           var readable = fs.createReadStream( reqPath.current.abs );
 
           readable.on( ERROR , function( err ) {
-            that.$emit( ERROR , function( e ) {
-
-            });
+            that.$emit( ERROR , err );
           });
 
           res.on( ERROR , function( err ) {
-            console.log('response error');
+            that.$emit( ERROR , err );
           });
 
           res.writeHead( resModel.statusCode , resModel.headers );
@@ -448,6 +572,11 @@ module.exports = (function() {
 
   function isIP( host ) {
     return (/(\d{1,3}\.){3}\d{1,3}/).test( host );
+  }
+
+
+  function ensureArray( subject ) {
+    return ( Array.isArray( subject ) ? subject : ( subject !== undefined ? [ subject ] : [] ));
   }
 
 

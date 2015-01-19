@@ -28,97 +28,154 @@
 
   var testRoutes = [
     new TestRoute( 200 , '/' , '/index.html' ),
-    new TestRoute( 302 , '/sub' , '/sub/' ),
-    new TestRoute( 200 , '/sub/' , '/sub/index.html' ),
+    // new TestRoute( 403 , '/forbidden' , '/forbidden' ),
+    // new TestRoute( 302 , '/sub' , '/sub/' ),
+    /*new TestRoute( 200 , '/sub/' , '/sub/index.html' ),
     new TestRoute( 302 , '/sub/notfound' , '/sub/notfound/' ),
     new TestRoute( 404 , '/sub/notfound/' , '/sub/notfound/index.html' ),
     new TestRoute( 404 , '/sub/notfound/asdf2/' , '/sub/notfound/asdf2/index.html' ),
     new TestRoute( 404 , '/sub/notfound/asdf3/' , '/sub/notfound/asdf3/index.html' ),
     new TestRoute( 200 , '/script.min.js' , '/script.min.js.gz' , {
       'Content-Type': 'application/javascript'
-    })
+    }),*/
+    // new TestRoute( 200 , '/large-file/' , '/large-file' )
   ];
   
-  describe( '#constructor' , function() {
-    it( 'should create a new httpd instance' , function( done ) {
-      server = new httpd({
-        verbose: false,
-        port: PORT,
-        ssl: SSL
-      })
-      .$when( 'error' , function( e , err ) {
-        util.print( '      ' );
-        console.log( err.stack.yellow );
+  describe( 'httpd-node' , function() {
+
+    describe( '#get' , function() {
+      
+      it( 'should initialize' , function( done ) {
+
+        server = new httpd({
+          port: PORT,
+          ssl: SSL
+        })
+        .env( 'profile' , 'dev' )
+        .dir( 'default' , '/public' )
+        /*.use(function( req , res , data ) {
+          httpd.log( data );
+        })*/
+        .$when( 'error' , function( e , err ) {
+          util.print( '      ' );
+          console.log( err.stack.yellow );
+        })
+        .$once( 'connect' , function( e ) {
+          done();
+        })
+        .start();
+
       });
-      assert.instanceOf( server , httpd );
-      done();
-    });
-  });
 
-  describe( '#dir' , function() {
-    it( 'should set the http dir for a subdomain' , function( done ) {
-      server.dir( 'default' , '/public' );
-      expect( server.httpRoot.default ).to.equal( '/public' );
-      done();
-    });
-  });
+      it( 'should handle get requests' , function( done ) {
 
-  describe( '#use' , function() {
-    it( 'should push to the _use array' , function( done ) {
-      var initLength = server._use.length;
-      server.use(function( req , res , data ) {
-        testFuncs[req.url].apply( null , arguments );
+        get( 'http://localhost:3000/index.html' ).then(function() {
+          done();
+        })
+        .catch(function( err ) {
+          httpd.log( err );
+          done();
+        });
+
       });
-      expect( server._use.length ).to.equal( initLength + 1 );
-      done();
     });
-  });
 
-  describe( '#rewrite' , function() {
+    return;
 
-    it( 'should push to the _rewriteRules array' , function( done ) {
-      server.rewrite({
-        pattern: /\.js$/i,
-        preserve: true,
-        handle: function( req , res , match ) {
-          if (httpd.gzip( req , res )) {
-            match = match.replace( /\.js$/i , '.js.gz' );
-          }
-          return match;
-        }
-      });
-      expect( server._rewriteRules.default.length ).to.equal( 1 );
-      done();
-    });
-  });
-
-  describe( '#start' , function() {
-    it( 'should start the httpd instance' , function( done ) {
-      util.print( '      ' );
-      server.start().$once( 'connect' , function( e ) {
-        assert.ok( true );
+    describe( '#constructor' , function() {
+      it( 'should create a new httpd instance' , function( done ) {
+        server = new httpd({
+          //verbose: false,
+          port: PORT,
+          ssl: SSL
+        })
+        .env( 'profile' , 'dev' )
+        .use(function( req , res , data ) {
+          httpd.log( data );
+        })
+        .$when( 'error' , function( e , err ) {
+          util.print( '      ' );
+          console.log( err.stack.yellow );
+        });
+        assert.instanceOf( server , httpd );
         done();
       });
     });
-  });
 
-  describe( '#_handle' , function() {
+    describe( '#dir' , function() {
+      it( 'should set the http dir for a subdomain' , function( done ) {
+        server.dir( 'default' , '/public' );
+        expect( server.httpRoot.default ).to.equal( '/public' );
+        done();
+      });
+    });
 
-    it( 'should handle http requests' , function( done ) {
+    describe( '#use' , function() {
+      it( 'should push to the _use array' , function( done ) {
+        //var initLength = server._use.length;
+        var initLength = server.handlers.use.length;
+        server.use(function( req , res , data ) {
+          testFuncs[req.url].apply( null , arguments );
+        });
+        //expect( server._use.length ).to.equal( initLength + 1 );
+        expect( server.handlers.use.length ).to.equal( initLength + 1 );
+        done();
+      });
+    });
 
-      var promises = testRoutes.map(function( tr ) {
-        testFuncs[tr.path || '/'] = function( req , res , data ) {
-          recurse( data , tr.data );
-        };
-        return get( tr.path ).then(function( res ) {
-          expect( res.body ).to.equal( tr.body );
+    describe( '#rewrite' , function() {
+
+      it( 'should push to the _rewriteRules array' , function( done ) {
+        server.rewrite({
+          pattern: /\.js$/i,
+          preserve: true,
+          /*handle: function( req , res , match ) {
+            if (httpd.gzip( req , res )) {
+              match = match.replace( /\.js$/i , '.js.gz' );
+            }
+            return match;
+          }*/
+          handle: function( match ) {
+            return match.replace( /\.js$/i , '.js.gz' );
+          }
+        });
+        expect( server._rewriteRules.default.length ).to.equal( 1 );
+        done();
+      });
+    });
+
+    describe( '#start' , function() {
+      it( 'should start the httpd instance' , function( done ) {
+        util.print( '      ' );
+        server.start().$once( 'connect' , function( e ) {
+          assert.ok( true );
+          done();
         });
       });
+    });
 
-      Promise.all( promises ).then(function() {
-        done();
-      })
-      .catch( done );
+    describe( '#_handle' , function() {
+
+      it( 'should handle http requests' , function( done ) {
+
+        var promises = testRoutes.map(function( tr ) {
+          testFuncs[tr.path || '/'] = function( req , res , data ) {
+            recurse( data , tr.data );
+          };
+          return get( tr.path ).then(function( res ) {
+            expect( res.body ).to.equal( tr.body );
+          });
+        });
+
+        Promise.all( promises ).then(function() {
+          done();
+        })
+        .catch( done );
+      });
+    });
+
+    after(function() {
+      server.stop();
     });
   });
 
