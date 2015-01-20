@@ -10,21 +10,13 @@
   });
 
   var server = new httpd({
-    port: 3000,
-    gzip: true
+    port: 3000
   })
   .dir( 'default' , '/public' )
   .env( 'profile' , 'dev' )
-  .rewrite({
+  .gzip({
     pattern: /\.js$/i,
-    preserve: true,
-    /*handle: function( req , res , match ) {
-      if (httpd.gzip( req , res )) {
-        match = match.replace( /\.js$/i , '.js.gz' );
-      }
-      return match;
-    }*/
-    handle: function( match ) {
+    replacement: function( match ) {
       return match.replace( /\.js$/i , '.js.gz' );
     }
   })

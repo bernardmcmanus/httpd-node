@@ -49,17 +49,20 @@
 
         server = new httpd({
           port: PORT,
-          gzip: true,
           ssl: SSL
         })
         .env( 'profile' , 'dev' )
         .dir( 'default' , '/public' )
         .rewrite({
           pattern: /\.js$/i,
-          preserve: true,
-          handle: function( match ) {
+          /*replacement: function( match ) {
             return match.replace( /\.js$/i , '.js.gz' );
-          }
+          }*/
+          replacement: '{{match}}.gz'
+        })
+        .gzip({
+          pattern: /^\/large-file(?=.txt)/,
+          replacement: '{{match}}.gz'
         })
         .use(function( $req , $res ) {
           //httpd.log( data );
@@ -75,7 +78,7 @@
 
       });
 
-      /*it( 'should handle get requests that respond with a string body' , function( done ) {
+      it( 'should handle get requests that respond with a string body' , function( done ) {
 
         get( 'http://localhost:3000/forbidden' ).then(function() {
           done();
@@ -84,9 +87,9 @@
           httpd.log( err );
           done();
         });
-      });*/
+      });
 
-      /*it( 'should handle get requests that respond with a readable stream' , function( done ) {
+      it( 'should handle get requests that respond with a readable stream' , function( done ) {
 
         get( 'http://localhost:3000' ).then(function() {
           done();
@@ -95,13 +98,22 @@
           httpd.log( err );
           done();
         });
-      });*/
+      });
 
       it( 'should handle large files' , function( done ) {
 
-        this.timeout( 20000 );
+        get( 'http://localhost:3000/large-file.txt?gnarly=rad' ).then(function() {
+          done();
+        })
+        .catch(function( err ) {
+          httpd.log( err );
+          done();
+        });
+      });
 
-        get( 'http://localhost:3000/large-file' ).then(function() {
+      it( 'should handle 302' , function( done ) {
+
+        get( 'http://localhost:3000/sub' ).then(function() {
           done();
         })
         .catch(function( err ) {
