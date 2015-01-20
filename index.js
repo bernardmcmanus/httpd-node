@@ -9,35 +9,36 @@ module.exports = (function() {
   var colors = require( 'colors' );
   var mime = require( 'mime' );
   var fs = require( 'fs-extra' );
+  var extend = require( 'extend' );
   var E$ = require( 'emoney' );
   var Promise = require( 'es6-promise' ).Promise;
 
 
   var $Request = require( './lib/request' );
   var $Response = require( './lib/response' );
-  var RequestPath = require( './lib/requestPath' );
   var Rewrite = require( './lib/rewrite' );
-  var RouteModel = require( './models/routeModel' );
-  var ResponseModel = require( './models/responseModel' );
   var log = require( './lib/logger' );
 
 
   var USE = 'use';
+  var WARN = 'warn';
   var ERROR = 'error';
   var SERVE = 'serve';
   var CONNECT = 'connect';
   var DISCONNECT = 'disconnect';
+  var RESOLVED = 'resolved';
   var START_MESSAGE = 'server running at [protocol]://localhost:[port]/';
 
 
-  var Environ = {
+  var ENV = {
     root: __dirname,
     logLevel: 'info',
     version: fs.readJsonSync( './package.json' ).version,
     profile: 'prod'
   };
 
-  Object.defineProperty( Environ , '_logLevels' , {
+
+  Object.defineProperty( ENV , '_logLevels' , {
     value: [ 'trace' , 'debug' , 'info' , 'warn' , 'error' ]
   });
 
@@ -45,18 +46,16 @@ module.exports = (function() {
   function httpd( options ) {
 
     var that = this;
-    options = options || {};
 
     that.port = 8888;
     that.index = 'index.html';
     that.verbose = true;
+    that.gzip = false;
     that.ssl = null;
 
-    Object.keys( options ).forEach(function( key ) {
-      that[key] = options[key];
-    });
+    extend( that , options );
 
-    that._environ = E$( Environ );
+    that._env = E$( ENV );
     that.listening = false;
     that._handle = that._handle.bind( that );
 
@@ -75,27 +74,24 @@ module.exports = (function() {
       httpRoot: {
         value: {}
       },
-      /*_use: {
-        value: []
-      },*/
       _rewriteRules: {
         value: {}
       }
     });
 
-    // watch environ
-    that.$watch( that._environ );
+    // watch intance _env
+    that.$watch( that._env );
 
     // listen to self
     that.$when();
 
-    // add the default httpRoot
+    // set the default httpRoot
     that.dir( 'default' , '/www' );
 
     // add default headers
-    that.use(function( req , res , data ) {
-      res.setHeader( 'Transfer-Encoding' , 'chunked' );
-      //res.setHeader( 'x-powered-by' , 'httpd-node ' + that._environ.version );
+    that.use(function( $req , $res ) {
+      $res.setHeaders({ 'Transfer-Encoding': 'chunked' });
+      //$res.$original.setHeader( 'x-powered-by' , 'httpd-node ' + that._env.version );
     });
   }
 
@@ -103,8 +99,8 @@ module.exports = (function() {
   httpd.log = log;
 
 
-  httpd.environ = function( key , value ) {
-    Environ[key] = value;
+  httpd.env = function( key , value ) {
+    ENV[key] = value;
   };
 
 
@@ -128,7 +124,7 @@ module.exports = (function() {
 
 
   httpd._getLogLevelIndex = function( text ) {
-    return Environ._logLevels.indexOf( text );
+    return ENV._logLevels.indexOf( text );
   };
 
 
@@ -176,9 +172,9 @@ module.exports = (function() {
 
     env: function( key , value ) {
       var that = this;
-      var environ = that._environ;
-      environ.$emit( 'set' , key , function( e ) {
-        environ[key] = value;
+      var env = that._env;
+      env.$emit( 'set' , key , function( e ) {
+        env[key] = value;
       });
       return that;
     },
@@ -223,46 +219,99 @@ module.exports = (function() {
 
     getHttpRoot: function( subdomain ) {
       var that = this;
-      var root = that._environ.root;
+      var root = that._env.root;
       var httpRoot = that.httpRoot;
       var relative = httpRoot[subdomain] || httpRoot.default;
       return root + relative;
     },
 
-    handleE$: function() {
+    handleE$: function( e ) {
 
       var that = this;
       var args = arrayCast( arguments );
-      var e = args.shift();
-      var target, key, err;
+      //var e = args.shift();
+      var target = e.target, key, err;
+
+      if (target instanceof $Request) {
+        that._handle$Request.apply( that , args );
+      }
+      else if (target instanceof $Response) {
+        that._handle$Response.apply( that , args );
+      }
+      else if (target === that) {
+
+        // remove event from args
+        args.shift();
+
+        switch (e.type) {
+
+          case 'set':
+            key = args.pop();
+            if (target === that._env && that._env[key] === 'dev') {
+              that.env( 'logLevel' , 'trace' );
+            }
+          break;
+
+          case SERVE:
+            if (that.verbose) {
+              //httpd.log.request.apply( null , args );
+            }
+          break;
+
+          case ERROR:
+            err = args.shift();
+            that._log( err , 4 );
+          break;
+
+          case CONNECT:
+            that.listening = true;
+          break;
+
+          case DISCONNECT:
+            that.listening = false;
+          break;
+        }
+      }
+    },
+
+    _handle$Request: function( e , data ) {
+
+      var that = this;
+      var target = e.target;
 
       switch (e.type) {
 
-        case 'set':
-          target = e.target;
-          key = args.pop();
-          if (target === that._environ && that._environ[key] === 'dev') {
-            that.env( 'logLevel' , 'trace' );
-          }
-        break;
-
-        case SERVE:
-          if (that.verbose) {
-            //httpd.log.request.apply( null , args );
-          }
+        case WARN:
+          that.$emit( ERROR , data );
         break;
 
         case ERROR:
-          err = args.shift();
-          that._log( err , 4 );
+          that.$emit( ERROR , data );
         break;
 
-        case CONNECT:
-          that.listening = true;
+        case RESOLVED:
+          that.$ignore( target );
+        break;
+      }
+    },
+
+    _handle$Response: function( e , data ) {
+      
+      var that = this;
+      var target = e.target;
+
+      switch (e.type) {
+
+        case WARN:
+          that.$emit( ERROR , data );
         break;
 
-        case DISCONNECT:
-          that.listening = false;
+        case ERROR:
+          that.$emit( ERROR , data );
+        break;
+
+        case RESOLVED:
+          that.$ignore( target );
         break;
       }
     },
@@ -306,17 +355,23 @@ module.exports = (function() {
       var subdomain = that._getSubdomain( req );
       var httpRoot = that.getHttpRoot( subdomain );
       var rewriteRules = that._getRewriteRules( subdomain );
-      return new $Request( req , {
+      var $req = new $Request( req , {
         subdomain: subdomain,
         rootDir: httpRoot,
         rewriteRules: rewriteRules,
         index: that.index
       });
+      that.$watch( $req );
+      return $req;
     },
 
     _spawnResponse: function( $req , res ) {
       var that = this;
-      return new $Response( $req , res );
+      var $res = new $Response( $req , res , {
+        gzip: that.gzip
+      });
+      that.$watch( $res );
+      return $res;
     },
 
     _handle: function( req , res ) {
@@ -326,32 +381,25 @@ module.exports = (function() {
       var $req = that._spawnRequest( req );
       //var $response = that._spawnResponse( $req , res );
 
-      $req.$process().then(function() {
-        //httpd.log($req);
-      })
-      .then(function() {
-
-        if ($req.$err) {
-          that.$emit( ERROR , $req.$err );
-        }
-
+      $req.digest().then(function() {
+        httpd.log($req);
         return that._spawnResponse( $req , res );
       })
       .then(function( $res ) {
-
-        httpd.log($res);
         
-        //that.$emit( USE , [ $req , $res ]);
+        //httpd.log(that.handlers.use);
+        that.$emit( USE , [ $req , $res ]);
         
-        console.log('end');
-
         return new Promise(function( resolve , reject ) {
           that.$emit( SERVE , [ $req , $res ] , resolve );
           reject();
         })
         .then(function() {
-          return $res.$send();
+          return $res.digest();
         });
+      })
+      .then(function( $res ) {
+        httpd.log($res);
       })
       .catch(function( err ) {
         httpd.log(err);
@@ -529,7 +577,7 @@ module.exports = (function() {
 
     _log: function( args , level ) {
       var that = this;
-      var logLevel = that._environ.logLevel;
+      var logLevel = that._env.logLevel;
       args = Array.isArray( args ) ? args : [ args ];
       if (level <= httpd._getLogLevelIndex( logLevel )) {
         httpd.log.apply( null , args );
@@ -538,7 +586,7 @@ module.exports = (function() {
 
     _fatal: function( res , err ) {
       var that = this;
-      var printStack = (that._environ.profile === 'dev');
+      var printStack = (that._env.profile === 'dev');
       that.$emit( ERROR , err );
       httpd._fatal( res , err , printStack );
     },

@@ -10,7 +10,8 @@
   });
 
   var server = new httpd({
-    port: 3000
+    port: 3000,
+    gzip: true
   })
   .dir( 'default' , '/public' )
   .env( 'profile' , 'dev' )

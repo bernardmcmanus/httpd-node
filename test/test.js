@@ -49,13 +49,21 @@
 
         server = new httpd({
           port: PORT,
+          gzip: true,
           ssl: SSL
         })
         .env( 'profile' , 'dev' )
         .dir( 'default' , '/public' )
-        /*.use(function( req , res , data ) {
-          httpd.log( data );
-        })*/
+        .rewrite({
+          pattern: /\.js$/i,
+          preserve: true,
+          handle: function( match ) {
+            return match.replace( /\.js$/i , '.js.gz' );
+          }
+        })
+        .use(function( $req , $res ) {
+          //httpd.log( data );
+        })
         .$when( 'error' , function( e , err ) {
           util.print( '      ' );
           console.log( err.stack.yellow );
@@ -67,16 +75,39 @@
 
       });
 
-      it( 'should handle get requests' , function( done ) {
+      /*it( 'should handle get requests that respond with a string body' , function( done ) {
 
-        get( 'http://localhost:3000/index.html' ).then(function() {
+        get( 'http://localhost:3000/forbidden' ).then(function() {
           done();
         })
         .catch(function( err ) {
           httpd.log( err );
           done();
         });
+      });*/
 
+      /*it( 'should handle get requests that respond with a readable stream' , function( done ) {
+
+        get( 'http://localhost:3000' ).then(function() {
+          done();
+        })
+        .catch(function( err ) {
+          httpd.log( err );
+          done();
+        });
+      });*/
+
+      it( 'should handle large files' , function( done ) {
+
+        this.timeout( 20000 );
+
+        get( 'http://localhost:3000/large-file' ).then(function() {
+          done();
+        })
+        .catch(function( err ) {
+          httpd.log( err );
+          done();
+        });
       });
     });
 
