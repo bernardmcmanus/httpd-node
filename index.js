@@ -4,6 +4,7 @@
 module.exports = (function() {
 
 
+  var path = require( 'path' );
   var http = require( 'http' );
   var https = require( 'https' );
   var colors = require( 'colors' );
@@ -34,7 +35,7 @@ module.exports = (function() {
   var ENV = {
     root: __dirname,
     logLevel: 'info',
-    version: fs.readJsonSync( './package.json' ).version,
+    version: fs.readJsonSync(path.resolve( __filename , '../package.json' )).version,
     profile: 'prod'
   };
 
