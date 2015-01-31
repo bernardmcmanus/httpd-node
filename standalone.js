@@ -13,19 +13,37 @@
     port: 3000
   })
   .dir( 'default' , '/public' )
-  .env( 'profile' , 'dev' )
+  //.env( 'profile' , 'dev' )
   .gzip({
     pattern: /\.js$/i,
     replacement: function( match ) {
       return match.replace( /\.js$/i , '.js.gz' );
     }
   })
-  .use(function( req , res , responseModel ) {
-    //httpd.log( responseModel );
+  .use(function( $req , $res ) {
+    
   })
-  .$when( 'error' , function( e , err ) {
+  .async(function( $req , $res , next ) {
+    setTimeout(function() {
+      console.log('next100');
+      next();
+    }, 100);
+  })
+  .async(function( $req , $res , next ) {
+    setTimeout(function() {
+      console.log('next500');
+      next();
+    }, 500);
+  })
+  .async(function( $req , $res , next ) {
+    setTimeout(function() {
+      console.log('next1000');
+      next();
+    }, 1000);
+  })
+  /*.$when( 'error' , function( e , err ) {
     httpd.log( err );
-  })
+  })*/
   /*.$when( '*' , function( e ) {
     var _e = Object.create( e );
     for (var key in e) {

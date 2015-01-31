@@ -15,9 +15,11 @@ module.exports = (function() {
   var Promise = require( 'es6-promise' ).Promise;
 
 
+  var Codes = require( './lib/codes' );
   var $Request = require( './lib/request' );
   var $Response = require( './lib/response' );
   var Rewrite = require( './lib/rewrite' );
+  var Warning = require( './lib/warning' );
   var log = require( './lib/logger' );
 
 
@@ -51,12 +53,12 @@ module.exports = (function() {
 
     that.port = 8888;
     that.index = 'index.html';
-    that.verbose = true;
     that.ssl = null;
+    that.asyncQueue = [];
 
     extend( that , options );
 
-    that._env = E$( ENV );
+    that._env = Object.create( ENV );
     that.listening = false;
     that._handle = that._handle.bind( that );
 
@@ -80,9 +82,6 @@ module.exports = (function() {
       }
     });
 
-    // watch intance _env
-    that.$watch( that._env );
-
     // listen to self
     that.$when();
 
@@ -99,44 +98,22 @@ module.exports = (function() {
 
   httpd.log = log;
 
-
   httpd.env = function( key , value ) {
     ENV[key] = value;
   };
-
-
-  /*httpd.gzip = function( req , res ) {
-    var accept = req.headers['Accept-Encoding'] || '';
-    if (accept.indexOf( 'gzip' )) {
-      res.setHeader( 'Content-Encoding' , 'gzip' );
-      return true;
-    }
-    return false;
-  };*/
-
-
-  httpd.cleanHeaders = function( res ) {
-    if (!res.headersSent) {
-      [ 'Content-Encoding' ].forEach(function( key ) {
-        res.removeHeader( key );
-      });
-    }
-  };
-
 
   httpd._getLogLevelIndex = function( text ) {
     return ENV._logLevels.indexOf( text );
   };
 
-
   httpd._fatal = function( res , err , printStack ) {
-    var routeModel = new RouteModel( 500 );
-    httpd.cleanHeaders( res );
-    res.writeHead( 500 , routeModel.headers );
-    res.write( routeModel.body );
-    res.end( stack ? err.stack : '' );
+    var def = Codes[500];
+    try {
+      res.writeHead( 500 , def.headers ); 
+    }
+    catch( err ) {}
+    res.end( printStack ? err.stack : def.body );
   };
-
 
   httpd._readSSL = function( key , cert ) {
     return {
@@ -154,6 +131,29 @@ module.exports = (function() {
         var args = arrayCast( arguments ).slice( 1 );
         handle.apply( null , args );
       });
+    },
+
+    async: function( handle ) {
+      var that = this;
+      var queue = that.asyncQueue;
+      queue.push(function( $req , $res ) {
+        return new Promise(function( resolve ) {
+          handle( $req , $res , resolve );
+        })
+        .catch(function( err ) {
+          that.$emit( ERROR , err );
+        });
+      });
+      return that;
+    },
+
+    _execAsync: function( $req , $res ) {
+      var that = this;
+      var queue = that.asyncQueue;
+      var promises = queue.map(function( func ) {
+        return func( $req , $res );
+      });
+      return Promise.all( promises );
     },
 
     rewrite: function( options , gzip ) {
@@ -178,9 +178,10 @@ module.exports = (function() {
     env: function( key , value ) {
       var that = this;
       var env = that._env;
-      env.$emit( 'set' , key , function( e ) {
-        env[key] = value;
-      });
+      if (key == 'profile' && value == 'dev') {
+        that.env( 'logLevel' , 'trace' );
+      }
+      env[key] = value;
       return that;
     },
 
@@ -234,15 +235,8 @@ module.exports = (function() {
 
       var that = this;
       var args = arrayCast( arguments );
-      //var e = args.shift();
       var target = e.target, key, err;
 
-      /*if (target instanceof $Request) {
-        that._handle$Request.apply( that , args );
-      }
-      else if (target instanceof $Response) {
-        that._handle$Response.apply( that , args );
-      }*/
       if (target instanceof $Request || target instanceof $Response) {
         that._handle$Correspondence.apply( that , args );
       }
@@ -253,22 +247,12 @@ module.exports = (function() {
 
         switch (e.type) {
 
-          case 'set':
-            key = args.pop();
-            if (target === that._env && that._env[key] === 'dev') {
-              that.env( 'logLevel' , 'trace' );
-            }
-          break;
-
-          case SERVE:
-            if (that.verbose) {
-              //httpd.log.request.apply( null , args );
-            }
+          case WARN:
+            that._log( new Warning( args[0] ) , WARN );
           break;
 
           case ERROR:
-            err = args.shift();
-            that._log( err , 4 );
+            that._log( args[0] , ERROR );
           break;
 
           case CONNECT:
@@ -290,7 +274,7 @@ module.exports = (function() {
       switch (e.type) {
 
         case WARN:
-          that.$emit( ERROR , data );
+          that.$emit( WARN , data );
         break;
 
         case ERROR:
@@ -362,40 +346,41 @@ module.exports = (function() {
     _handle: function( req , res ) {
 
       var that = this;
-
       var $req = that._spawnRequest( req );
-      //var $response = that._spawnResponse( $req , res );
 
       $req.digest().then(function() {
-        httpd.log($req);
         return that._spawnResponse( $req , res );
       })
       .then(function( $res ) {
-        
-        //httpd.log(that.handlers.use);
         that.$emit( USE , [ $req , $res ]);
-        
-        return new Promise(function( resolve , reject ) {
-          that.$emit( SERVE , [ $req , $res ] , resolve );
-          reject();
-        })
-        .then(function() {
-          return $res.digest();
+        return that._execAsync( $req , $res ).then(function() {
+          return $res;
         });
       })
       .then(function( $res ) {
-        httpd.log($res);
+        return new Promise(function( resolve , reject ) {
+          that.$emit( SERVE , [ $req , $res ] , function( e ) {
+            resolve( $res );
+          });
+          reject();
+        });
+      })
+      .then(function( $res ) {
+        return $res.digest();
+      })
+      .then(function( $res ) {
+        that._log( $req , 'info' );
       })
       .catch(function( err ) {
-        httpd.log(err);
+        that._fatal( res , err );
       });
     },
 
     _log: function( args , level ) {
       var that = this;
-      var logLevel = that._env.logLevel;
+      var logLevel = httpd._getLogLevelIndex( that._env.logLevel );
       args = Array.isArray( args ) ? args : [ args ];
-      if (level <= httpd._getLogLevelIndex( logLevel )) {
+      if (httpd._getLogLevelIndex( level ) >= logLevel) {
         httpd.log.apply( null , args );
       }
     },
