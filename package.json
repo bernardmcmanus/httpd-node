@@ -41,11 +41,11 @@
         "grunt-contrib-watch": ">=0.6.1"
     },
     "dependencies": {
-        "emoney": ">=0.2.3",
-        "es6-promise": ">=2.0.1",
-        "colors": ">=1.0.2",
-        "fs-extra": "0.9.1",
-        "mime": ">=1.2.11"
+        "emoney": "^0.2.3",
+        "es6-promise": "^2.0.1",
+        "colors": "^1.0.2",
+        "fs-extra": "^0.9.1",
+        "mime": "^1.2.11"
     }
 }
 
