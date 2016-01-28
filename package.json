@@ -1,69 +1,49 @@
 {
-    "name": "httpd-node",
-    "version": "0.2.0",
-    "description": "A super simple HTTPD server for node.js",
-    "main": "index.js",
-    "scripts": {
-        "start": "supervisor standalone.js",
-        "test": "clear; mocha test/test.js"
-    },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/elnarddogg/httpd-node.git"
-    },
-    "keywords": [
-        "http",
-        "https",
-        "server",
-        "ssl",
-        "simple",
-        "subdomain",
-        "rewrite"
-    ],
-    "author": {
-        "name": "Bernard McManus",
-        "email": "bernard.mcmanus.iv@gmail.com",
-        "url": "http://github.com/elnarddogg/httpd-node"
-    },
-    "license": {
-        "type": "MIT",
-        "url": "https://github.com/elnarddogg/httpd-node/blob/master/LICENSE.txt"
-    },
-    "bugs": {
-        "url": "https://github.com/elnarddogg/httpd-node/issues"
-    },
-    "homepage": "https://github.com/elnarddogg/httpd-node",
-    "devDependencies": {
-        "mocha": ">=1.21.4",
-        "chai": ">=1.9.1",
-        "grunt": "~0.4.2",
-        "grunt-contrib-jshint": "~0.6.3",
-        "grunt-contrib-watch": ">=0.6.1"
-    },
-    "dependencies": {
-        "emoney": "^0.2.3",
-        "es6-promise": "^2.0.1",
-        "colors": "^1.0.2",
-        "fs-extra": "^0.9.1",
-        "mime": "^1.2.11"
-    }
+  "name": "httpd-node",
+  "version": "0.3.0",
+  "description": "A super simple HTTPD server for node.js",
+  "main": "index.js",
+  "scripts": {
+    "start": "node standalone.js",
+    "test": "mocha test/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elnarddogg/httpd-node.git"
+  },
+  "keywords": [
+    "http",
+    "https",
+    "server",
+    "ssl",
+    "simple",
+    "subdomain",
+    "rewrite"
+  ],
+  "author": {
+    "name": "Bernard McManus",
+    "email": "bernard.mcmanus.iv@gmail.com",
+    "url": "http://github.com/elnarddogg/httpd-node"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/elnarddogg/httpd-node/issues"
+  },
+  "homepage": "https://github.com/elnarddogg/httpd-node",
+  "devDependencies": {
+    "mocha": ">=1.21.4",
+    "chai": ">=1.9.1",
+    "grunt": "~0.4.2",
+    "grunt-contrib-jshint": "~0.6.3",
+    "grunt-contrib-watch": ">=0.6.1"
+  },
+  "dependencies": {
+    "bluebird": "^3.1.5",
+    "colors": "^1.0.2",
+    "emoney": "^1.0.2",
+    "es6-promise": "^2.0.1",
+    "fs-extra": "^0.9.1",
+    "lodash": "^4.0.1",
+    "mime": "^1.2.11"
+  }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
