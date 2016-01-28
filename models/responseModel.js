@@ -3,6 +3,7 @@ module.exports = (function() {
   
   function ResponseModel( subdomain , httpRoot , reqPath , routeModel ) {
     var that = this;
+    that.route = routeModel;
     that.subdomain = subdomain;
     that.httpRoot = httpRoot;
     that.statusCode = routeModel.statusCode;
